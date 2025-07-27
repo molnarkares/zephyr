@@ -1,0 +1,11 @@
+sample:
+  description: Demonstration of Noritake Graphics Display driver
+  name: GU display sample
+tests:
+  sample.drivers.display_vfd:
+    tags: display
+    harness_config:
+      fixture: fixture_display
+    platform_allow: frdm_k64f
+    integration_platforms:
+      - frdm_k64f

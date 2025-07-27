@@ -1,0 +1,8 @@
+# Copyright (c) 2025 Karoly Molnar
+# SPDX-License-Identifier: Apache-2.0
+
+title: Noritake GU series VFD on UART
+
+compatible: "noritake,gu_vfd"
+
+include: ["noritake,gu_vfd-common.yaml", "spi-device.yaml"]

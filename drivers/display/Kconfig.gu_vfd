@@ -1,0 +1,35 @@
+# Noritake GU series VFD configuration options
+
+# Copyright (c) Karoly Molnar
+# SPDX-License-Identifier: Apache-2.0
+
+config NORITAKE_GU_VFD
+	bool "Noritake GU VFD Graphic display driver"
+	default y
+	depends on DT_HAS_NORITAKE_GU_VFD_ENABLED
+#	select I2C if $(dt_compat_on_bus,$(DT_COMPAT_NORITAKE_GU_VFD),i2c)
+#	select SPI if $(dt_compat_on_bus,$(DT_COMPAT_NORITAKE_GU_VFD),spi)
+#	select SERIAL if $(dt_compat_on_bus,$(DT_COMPAT_NORITAKE_GU_VFD),uart)
+	select GPIO
+	select SPI
+	help
+	  Enable driver for Noritake GU VFD Graphic display
+
+if NORITAKE_GU_VFD
+
+config GU_VFD_DEFAULT_BRIGHTNESS
+	int "Noritake GU VFD default brightness"
+	default 5
+	range 1 7
+	help
+	  Noritake GU VFD default brightness.
+
+config GU_VFD_USE_SPI_TRANSFER_FOR_WRITE
+	bool "call spi_transfer instead of spi_write"
+	default n
+	help
+	  Certain SPI drivers do not support one directional SPI write.
+	  ENable this to use spi_transfer in place of spi_write
+
+
+endif # NORITAKE_GU_VFD

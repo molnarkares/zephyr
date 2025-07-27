@@ -1,0 +1,18 @@
+# Copyright (c) 2025 Karoly Molnar
+# SPDX-License-Identifier: Apache-2.0
+
+include: display-controller.yaml
+
+description: |
+  Noritake GU VFD is High Brightness Dot Graphic Display
+
+properties:
+  mb-gpios:
+    type: phandle-array
+    required: true
+    description: GPIO used for Module Busy detection
+
+  reset-gpios:
+    type: phandle-array
+    description: GPIO used to reset the display
+

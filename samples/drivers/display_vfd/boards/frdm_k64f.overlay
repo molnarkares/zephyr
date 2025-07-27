@@ -1,0 +1,22 @@
+/*
+ * Copyright (c) 2025 Karoly Molnar
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+&arduino_spi {
+	status = "okay";
+	cs-gpios = <&gpiod 0 GPIO_ACTIVE_LOW>;
+	vfd_display: gu_vfd@0 {
+		compatible = "noritake,gu_vfd";
+		reg = <0x0>;
+		spi-max-frequency = <1000000>;
+		width = <144>;
+		height = <40>;
+		mb-gpios = <&gpioc 3 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpioa 2 GPIO_ACTIVE_LOW>;
+	};
+};
+
+&uart2 {
+	status = "disabled";
+};
