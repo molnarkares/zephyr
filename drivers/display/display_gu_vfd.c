@@ -39,11 +39,14 @@ union gu_vfd_bus {
 };
 
 typedef bool (*gu_vfd_connection_ready_fn)(const struct device *dev);
-typedef int (*gu_vfd_write_fn)(const struct device *dev, uint8_t *buf, size_t len);
+typedef int (*gu_vfd_write_fn)(const struct device *dev, uint8_t data);
+typedef int (*gu_vfd_read_fn)(const struct device *dev, uint8_t * data);
 typedef const char *(*gu_vfd_connection_name_fn)(const struct device *dev);
 
+static int gu_vfd_write_buffer(const struct device *dev, uint8_t *const buf, const size_t len, bool packet);
+
 struct gu_vfd_data {
-    uint8_t *dummy_rx_buffer;
+    uint8_t *dummy_buffer;
 };
 
 struct gu_vfd_config {
@@ -53,6 +56,7 @@ struct gu_vfd_config {
     struct gpio_dt_spec reset_pin;
     gu_vfd_connection_ready_fn connection_ready;
     gu_vfd_write_fn write;
+    gu_vfd_read_fn read;
     gu_vfd_connection_name_fn connection_name;
     uint16_t height;
     uint16_t width;
@@ -62,7 +66,6 @@ static int gu_vfd_wait_for_ready(const struct device *dev)
 {
     int mb_state = 0;
     const struct gu_vfd_config *config = dev->config;
-    k_usleep(10);
     do {
         mb_state = gpio_pin_get_dt(&config->mb_pin);
     }while (mb_state == 1);
@@ -74,39 +77,21 @@ static int gu_vfd_write(const struct device *dev, const uint16_t x,
                            const struct display_buffer_descriptor *desc,
                            const void *buf)
 {
-    // struct gu_vfd_data *data = dev->data;
 
-    // /* Sanity checks */
-    // if ((x + desc->width > VFD_WIDTH) || (y + desc->height > VFD_HEIGHT)) {
-    //     return -EINVAL;
-    // }
-    //
-    // /* Set drawing window / cursor — depends on Noritake command set */
-    // uint8_t set_pos[] = { 0x1B, 'L', (uint8_t)x, (uint8_t)y };
-    // struct spi_buf txb1 = { .buf = set_pos, .len = sizeof(set_pos) };
-    // struct spi_buf_set tx1 = { .buffers = &txb1, .count = 1 };
-    // spi_write(data->spi, &data->spi_cfg, &tx1);
-    //
-    // /* Send raw bitmap data row by row (your implementation may vary) */
-    // struct spi_buf txb2 = { .buf = (void *)buf, .len = desc->buf_size };
-    // struct spi_buf_set tx2 = { .buffers = &txb2, .count = 1 };
-    // spi_write(data->spi, &data->spi_cfg, &tx2);
 
     return 0;
 }
 
 static int gu_vfd_blanking_on(const struct device *dev)
 {
-    const struct gu_vfd_config *config = dev->config;
     uint8_t cmd[] = { GU_VFD_CMD_POWER_OFF>>8, GU_VFD_CMD_POWER_OFF&0xFFu };
-    return config->write(dev,cmd,sizeof(cmd));
+    return gu_vfd_write_buffer(dev,cmd,sizeof(cmd),false);
 }
 
 static int gu_vfd_blanking_off(const struct device *dev)
 {
-    const struct gu_vfd_config *config = dev->config;
     uint8_t cmd[] = { GU_VFD_CMD_POWER_ON>>8, GU_VFD_CMD_POWER_ON&0xFFu };
-    return config->write(dev,cmd,sizeof(cmd));
+    return gu_vfd_write_buffer(dev,cmd,sizeof(cmd), false);
 }
 
 
@@ -123,11 +108,8 @@ static void gu_vfd_get_capabilities(const struct device *dev,
 }
 
 /* --- Init --- */
-static int gu_vfd_init(const struct device *dev)
-{
-
+static int gu_vfd_init(const struct device *dev) {
     const struct gu_vfd_config *config = dev->config;
-    struct gu_vfd_data *data = dev->data;
     if (!config->connection_ready(dev))
     {
         LOG_ERR("Serial connection device is not ready");
@@ -184,34 +166,26 @@ static int gu_vfd_init(const struct device *dev)
         return -ENODEV;
     }
 
-#if CONFIG_GU_VFD_USE_SPI_TRANSFER_FOR_WRITE==1
-    data->dummy_rx_buffer = k_malloc(config->height*config->width/8);
-    if (data->dummy_rx_buffer == NULL)
-    {
-        LOG_ERR("Unable to allocate memory for dummy SPI Rx buffer");
-        return -ENOMEM;
-    }
-#else
-    data->dummy_rx_buffer = NULL;
-#endif
-    uint8_t test_msg[] = {'n','o','r'};
-    return config->write(dev,test_msg,sizeof(test_msg));
-    // uint8_t cmd[] = { GU_VFD_CMD_BINARY_MODE>>8, GU_VFD_CMD_BINARY_MODE&0xFFu };
-    // return config->write(dev,cmd,sizeof(cmd));
-    // return 0;
+    // uint8_t comm_setup[] = {GU_VFD_CMD_SET_COMM>>8, GU_VFD_CMD_SET_COMM& 0xFFu,
+    // GU_VFD_SERIAL_PACKET_MODE_ON|GU_VFD_SERIAL_COMM_BUFFER_ON};
+    // gu_vfd_write_buffer(dev,comm_setup,sizeof(comm_setup), false);
+
+    /* disable HEX mode */
+    uint8_t cmd[] = {GU_VFD_CMD_BINARY_MODE >> 8, GU_VFD_CMD_BINARY_MODE& 0xFFu};
+    gu_vfd_write_buffer(dev,cmd,sizeof(cmd), false);
+
+
+    uint8_t message[] = {'M','y',' ','t','e','s','t'};
+    gu_vfd_write_buffer(dev,message,sizeof(message), false);
+
+
+    return 0;
 }
 
 static int gu_vfd_deinit(const struct device *dev)
 {
-    struct gu_vfd_data *data = dev->data;
     /* wait for finalizing current operation */
     gu_vfd_wait_for_ready(dev);
-#if CONFIG_GU_VFD_USE_SPI_TRANSFER_FOR_WRITE==1
-    if (data->dummy_rx_buffer != NULL)
-    {
-        k_free(data->dummy_rx_buffer);
-    }
-#endif
     return 0;
 }
 
@@ -224,9 +198,8 @@ static int gu_vfd_set_brightness(const struct device *dev, const uint8_t brightn
     }
     else
     {
-        const struct gu_vfd_config *config = dev->config;
         uint8_t cmd[] = { GU_VFD_CMD_BRIGHTNESS, GU_VFD_BRIGHTNESS_0 + brightness };
-        ret = config->write(dev,cmd,sizeof(cmd));
+        ret = gu_vfd_write_buffer(dev,cmd,sizeof(cmd), false);
     }
 
     return ret;
@@ -236,7 +209,7 @@ static int gu_vfd_clear(const struct device *dev)
 {
     const struct gu_vfd_config *config = dev->config;
     uint8_t cmd[] = { GU_VFD_CMD_CLEAR_AREA, 0, 0, config->width,config->height };
-    return config->write(dev,cmd,sizeof(cmd));
+    return gu_vfd_write_buffer(dev,cmd,sizeof(cmd), false);
 
 }
 
@@ -249,40 +222,86 @@ static bool gu_vfd_connection_ready_spi(const struct device *dev)
     return spi_is_ready_dt(&config->connection.spi);
 }
 
-static int gu_vfd_write_spi(const struct device *dev, uint8_t *buf, size_t len)
+static int gu_vfd_write_buffer(const struct device *dev, uint8_t *const buf, const size_t len, bool packet)
 {
     const struct gu_vfd_config *config = dev->config;
+    if (packet == true)
+    {
+        uint8_t cmd[] = {GU_VFD_CMD_PACKET_START, len};
+        gu_vfd_write_buffer(dev,cmd,sizeof(cmd), false);
+    }
+    uint8_t checksum = 0;
+    for (size_t i = 0; i < len; i++)
+    {
+        uint8_t data = buf[i];
+        checksum += data;
+        config->write(dev,data);
+        gu_vfd_wait_for_ready(dev);
+    }
+    if (packet == true)
+    {
+        uint8_t cmd[] = {checksum, GU_VFD_CMD_PACKET_STOP};
+        gu_vfd_write_buffer(dev,cmd,sizeof(cmd), false);
+    }
+    return 0;
+}
 
-    const struct spi_buf tx_buf = {
-        .buf = buf,
-        .len = len
+static int gu_vfd_write_spi(const struct device *dev, uint8_t const data)
+{
+
+    const struct gu_vfd_config *config = dev->config;
+
+    uint8_t dummy_rx =0;
+
+    struct spi_buf tx_buf = {
+        .buf = (uint8_t*)&data,
+        .len = 1
     };
-
 
     const struct spi_buf_set tx_bufs = {
         .buffers = &tx_buf,
         .count = 1
     };
 
-#if CONFIG_GU_VFD_USE_SPI_TRANSFER_FOR_WRITE==1
-    struct gu_vfd_data *data = dev->data;
+    struct spi_buf rx_buf = {
+        .buf = &dummy_rx,
+        .len = 0
+    };
+
+    const struct spi_buf_set rx_bufs = {
+        .buffers = &rx_buf,
+        .count = 0
+    };
+    return spi_transceive_dt(&config->connection.spi, &tx_bufs, &rx_bufs);
+}
+
+static int gu_vfd_read_spi(const struct device *dev, uint8_t * data)
+{
+    const struct gu_vfd_config *config = dev->config;
+    uint8_t dummy_tx = GU_VFD_CMD_DUMMY;
+
 
     const struct spi_buf rx_buf = {
-        .buf = data->dummy_rx_buffer,
-        .len = len
+        .buf = data,
+        .len = 1
     };
 
     const struct spi_buf_set rx_bufs = {
         .buffers = &rx_buf,
         .count = 1
     };
-    spi_transceive_dt(&config->connection.spi, &tx_bufs, &rx_bufs);
-#else
-    spi_write_dt(&config->connection.spi, &tx_bufs);
-#endif
 
+    const struct spi_buf tx_buf = {
+        .buf = &dummy_tx,
+        .len = 1
+    };
 
-    return gu_vfd_wait_for_ready(dev);
+    const struct spi_buf_set tx_bufs = {
+        .buffers = &tx_buf,
+        .count = 1
+    };
+
+    return spi_transceive_dt(&config->connection.spi, &tx_bufs, &rx_bufs);
 }
 
 static const char *gu_vfd_connection_name_spi(const struct device *dev)
@@ -309,6 +328,7 @@ static DEVICE_API(display, gu_vfd_driver_api) = {
     node_id, SPI_OP_MODE_MASTER | SPI_TRANSFER_MSB | SPI_WORD_SET(8), 0)},  \
     .connection_ready = gu_vfd_connection_ready_spi,                        \
     .write = gu_vfd_write_spi,                                              \
+    .read = gu_vfd_read_spi,                                                \
     .connection_name = gu_vfd_connection_name_spi,
 
 
@@ -316,6 +336,7 @@ static DEVICE_API(display, gu_vfd_driver_api) = {
     .bus = {.i2c = I2C_DT_SPEC_GET(node_id)},                       \
     .connection_ready = gu_vfd_connection_ready_spi,                \
     .write = gu_vfd_write_spi,                                      \
+    .read = gu_vfd_read_spi,                                      \
     .connection_name = gu_vfd_connection_name_spi,
 
 #define GU_VFD_DEFINE(node_id)                                                      \

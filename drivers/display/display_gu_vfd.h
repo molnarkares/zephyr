@@ -12,6 +12,19 @@
 /*! Dummy Byte - Code: 00H (50µs) */
 #define GU_VFD_CMD_DUMMY    0x0u
 
+/*! Packet Start Byte - Code: 02H */
+#define GU_VFD_CMD_PACKET_START    0x02u
+
+/*! Packet Stop Byte - Code: 03H */
+#define GU_VFD_CMD_PACKET_STOP    0x03u
+
+/*! Response Packet GOOD: 50H */
+#define GU_VFD_PACKET_GOOD    0x50u
+
+/*! Response Packet BAD: 45H */
+#define GU_VFD_PACKET_BAD    0x45u
+
+
 /*! Macro Start - Code: 01H – 07H (BUSY time depends on contents) */
 #define GU_VFD_CMD_MACRO(x)    (0x1u + (x))
 
@@ -115,6 +128,8 @@
 #define GU_VFD_CMD_BINARY_MODE 0x1B42u
 
 /*! Set Serial Communications - Code: 1BH + 49H + Data */
+#define GU_VFD_CMD_SET_COMM             0x1B49u
+
 #define GU_VFD_SERIAL_AUTO_IO_SEND_ON   (1u<<7)
 #define GU_VFD_SERIAL_AUTO_IO_SEND_OFF  (0u<<7)
 #define GU_VFD_SERIAL_PACKET_MODE_ON    (1u<<6)
@@ -134,6 +149,7 @@
 
 /*! Enable I/O Port - Code: 1BH + 44H + Data (50µs + 80ms[Last Byte]) */
 #define GU_VFD_CMD_ENABLE_IO_PORT       0x1B44u
+
 
 /*! Read Port - Code: 1BH + 52H (50µs) */
 #define GU_VFD_CMD_READ_PORT            0x1B52u
