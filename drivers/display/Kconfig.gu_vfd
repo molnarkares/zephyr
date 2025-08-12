@@ -24,12 +24,4 @@ config GU_VFD_DEFAULT_BRIGHTNESS
 	help
 	  Noritake GU VFD default brightness.
 
-config GU_VFD_USE_SPI_TRANSFER_FOR_WRITE
-	bool "call spi_transfer instead of spi_write"
-	default n
-	help
-	  Certain SPI drivers do not support one directional SPI write.
-	  ENable this to use spi_transfer in place of spi_write
-
-
 endif # NORITAKE_GU_VFD
